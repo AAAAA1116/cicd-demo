@@ -1,0 +1,37 @@
+# 持续集成：每次 push / 提 PR 都自动跑，验证代码能不能合进主干
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]   # 多版本矩阵，和本地只跑一个版本不同
+
+    steps:
+      - name: 1. 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 2. 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip                                # 依赖缓存，对应本地的“缓存命中跳过安装”
+
+      - name: 3. 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 4. 静态检查
+        run: python -m compileall -q src tests
+
+      - name: 5. 运行测试
+        run: python -m pytest -v
+        # 这一步红灯 = 整个 job 失败 = PR 上出现红叉，禁止合并

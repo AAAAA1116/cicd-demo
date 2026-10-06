@@ -1,0 +1,44 @@
+# 持续部署：只有打了版本标签（v*）才触发，把通过 CI 的代码发布出去
+name: CD
+
+on:
+  push:
+    tags: ["v*"]            # git tag v1.0.0 && git push origin v1.0.0
+  workflow_dispatch:        # 也支持在网页上手动点一下触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # 真实项目里这里通常还会写 needs: ci，确保 CI 绿了才允许部署
+
+    steps:
+      - name: 1. 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 2. 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: 3. 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 4. 回归测试（部署前最后一道闸）
+        run: python -m pytest
+
+      - name: 5. 构建产物
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "构建版本 $VERSION"
+          zip -r pricing-$VERSION.zip src
+
+      - name: 6. 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package
+          path: pricing-*.zip
+
+      - name: 7. 部署（示意）
+        run: echo "这里换成 scp / kubectl / docker push / 云函数发布 等真实命令"
+        # 生产环境的密钥一律放在 Settings -> Secrets，绝不能写进 yaml
